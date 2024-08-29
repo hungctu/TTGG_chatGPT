@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .chat-container {
+            width: 80%;
+            margin: auto;
+            max-width: 800px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .user-message {
+            background-color: #e1f5fe;
+        }
+        .bot-message {
+            background-color: #f1f8e9;
+        }
+        .code-block {
+            background-color: #333;
+            color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: monospace;
+            position: relative;
+        }
+        .copy-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #555;
+            color: #fff;
+            border: none;
+            padding: 5px;
+            cursor: pointer;
+        }
+        .input-container {
+            display: flex;
+            margin-top: 10px;
+        }
+        .input-container input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .input-container button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: #fff;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div id="messages">
+            <div class="message bot-message"><strong>TTGG Chat GPT 4.0</strong></div>
+        </div>
+        <div class="input-container">
+            <input type="text" id="user-input" placeholder="Type your message..." onkeypress="if(event.keyCode==13) sendMessage()">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const validUsers = {
+            'dXNlcjE=': 'cGFzczE=',
+            'dXNlcjI=': 'cGFzczI=',
+            'bm9haA==': 'MTIz'
+        };
+
+        const keywordResponses = {
+            'YWJj': 'Nội dung của từ khóa 1',
+            'ZGVm': 'Nội dung của từ khóa 2',
+            'ZGVmY29uY2E=': 'Nội dung của từ khóa 3'
+        };
+
+        const helpContent = 'Danh sách lệnh:\n' +
+                            '1. login [username] [password] - Đăng nhập vào hệ thống.\n' +
+                            '2. [từ khóa] - \n' +
+                            '3. logout - Đăng xuất khỏi hệ thống.\n';
+
+        let loggedIn = false;
+        let username = '';
+
+        function formatResponse(response) {
+            // Biểu thức chính quy để tìm các khối code
+            const codeBlockRegex = /```([a-zA-Z]*)\n([\s\S]*?)```/g;
+            let formattedResponse = '';
+
+            let lastIndex = 0;
+            let match;
+
+            // Xử lý từng khối code
+            while ((match = codeBlockRegex.exec(response)) !== null) {
+                // Thêm văn bản trước khối code
+                formattedResponse += escapeHtml(response.slice(lastIndex, match.index));
+
+                // Phần code và ngôn ngữ
+                const language = match[1];
+                const code = match[2];
+
+                // Thêm khối code vào response
+                formattedResponse += `
+                    <div class="code-block">
+                        <button class="copy-button" onclick="copyCode()">Copy code</button>
+                        <pre><code class="${language}">${escapeCode(code, language)}</code></pre>
+                    </div>
+                `;
+
+                lastIndex = codeBlockRegex.lastIndex;
+            }
+
+            // Thêm phần văn bản còn lại sau khối code cuối cùng
+            formattedResponse += response.slice(lastIndex);
+
+            // Thay thế các ký tự đặc biệt trong văn bản
+            formattedResponse = formattedResponse.replace(/- /g, '<br>- ')
+                                                .replace(/\. /g, '<br>. ');
+
+            return formattedResponse;
+        }
+
+        function escapeCode(code, language) {
+            // Đối với HTML và CSS, không escape các ký tự HTML đặc biệt
+            if (language === 'html' || language === 'css') {
+                return code; // Trả về nguyên bản
+            }
+            return escapeHtml(code); // Đối với các ngôn ngữ khác
+        }
+
+        function escapeHtml(unsafe) {
+            return unsafe.replace(/&/g, "&amp;")
+                         .replace(/</g, "&lt;")
+                         .replace(/>/g, "&gt;")
+                         .replace(/"/g, "&quot;")
+                         .replace(/'/g, "&#039;");
+        }
+
+        function copyCode() {
+            const codeBlock = document.querySelector('.code-block code');
+            if (codeBlock) {
+                navigator.clipboard.writeText(codeBlock.textContent).then(() => {
+                    alert('Code copied to clipboard!');
+                });
+            }
+        }
+
+        function sendMessage() {
+            const userMessage = document.getElementById('user-input').value.trim();
+            const messagesDiv = document.getElementById('messages');
+
+            // Thêm tin nhắn của người dùng vào giao diện
+            messagesDiv.innerHTML += `<div class="message user-message">${escapeHtml(userMessage)}</div>`;
+
+            if (!loggedIn) {
+                if (userMessage === 'help') {
+                    messagesDiv.innerHTML += `<div class="message bot-message"><strong>🤖</strong> ${formatResponse(helpContent)}</div>`;
+                } else if (userMessage.startsWith('login ')) {
+                    const parts = userMessage.substring(6).trim().split(' ');
+                    const potentialUsername = btoa(parts[0]);
+                    const potentialPassword = btoa(parts[1] || '');
+
+                   if (validUsers[potentialUsername] === potentialPassword) {
+                        username = atob(potentialUsername);
+                        loggedIn = true;
+                        messagesDiv.innerHTML += `<div class="message bot-message"><strong>TTG1:</strong> Đăng nhập thành công, ${escapeHtml(username)}. Vui lòng nhập lệnh.</div>`;
+                        document.getElementById('user-input').value = ''; // Xóa nội dung textbox sau khi đăng nhập thành công
+                    } else {
+                        messagesDiv.innerHTML += `<div class="message bot-message"><strong>TTG1:</strong> Tên người dùng hoặc mật khẩu không hợp lệ.</div>`;
+                    }
+                } else {
+                    messagesDiv.innerHTML += `<div class="message bot-message"><strong>TTG1:</strong> Bạn cần đăng nhập trước khi sử dụng chat. Sử dụng lệnh 'help' để biết thêm thông tin.</div>`;
+                }
+            } else {
+                if (userMessage === 'logout') {
+                    logout();
+                    return;
+                }
+                fetch('https://thehungnguyenctu.pythonanywhere.com/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: userMessage })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    messagesDiv.innerHTML += `<div class="message bot-message"><strong>TTG1:</strong> ${formatResponse(escapeHtml(data.response))}</div>`;
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    messagesDiv.innerHTML += `<div class="message bot-message"><strong>TTG:</strong> Đã xảy ra lỗi khi kết nối với API.</div>`;
+                });
+
+
+            }
+            document.getElementById('user-input').value = '';// Xóa nội dung của textbox sau khi gửi tin nhắn
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function logout() {
+            loggedIn = false;
+            username = '';
+            document.getElementById('logout-button').style.display = 'none';
+            document.getElementById('messages').innerHTML = `<div class="message bot-message"><strong>TTGG Chat GPT 4.0</strong></div>`;
+            document.getElementById('user-input').value = '';
+        }
+    </script>
+</body>
+</html>
